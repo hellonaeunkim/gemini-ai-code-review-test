@@ -1,5 +1,7 @@
 package annovation.gemini.test.controller;
 
+import java.util.Optional;
+
 @RestController
 @RequestMapping("/{users}")
 public class UserController {
@@ -25,5 +27,12 @@ public class UserController {
                 .body(createdUser);
     }
 
+    // R
+    @GetMapping("/{id}")
+    public ResponseEntity<UserEntity> getUserById(@PathVariable("id") long id) {
+        Optional<UserEntity> user = userService.findById(id);
 
+        return user.map(ResponseEntity::ok)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND)); // http status code= 404
+    }
 }
