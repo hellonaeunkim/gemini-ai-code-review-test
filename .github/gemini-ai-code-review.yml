@@ -1,0 +1,73 @@
+name: Gemini AI Code Review
+
+on:
+  workflow_dispatch: # GitHub Actions에서 직접 실행 가능
+  pull_request:
+    types: [ opened, synchronize ]
+
+jobs:
+  code-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v3
+
+      - name: Install GoogleGenerativeAI
+        run: |
+          npm install @google/generative-ai
+
+      - name: Get git diff
+        run: |
+          git fetch origin "${{ github.event.pull_request.base.ref }}"
+          git fetch origin "${{ github.event.pull_request.head.ref }}"
+          git diff --unified=0 "origin/${{ github.event.pull_request.base.ref }}" > "diff.txt"
+
+      - name: Run Gemini-1.5-flash
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require("fs");
+            const { GoogleGenerativeAI } = require("@google/generative-ai");
+            const genAI = new GoogleGenerativeAI("${{ secrets.GEMINI_API_KEY }}");
+            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+            const diff_output = fs.readFileSync("diff.txt", "utf8");
+            const prompt = `You are a senior software engineer and need to perform a code review based on the results of a given git diff. Provide feedback for the code changes, highlighting issues related to security, readability, and performance.\n<git diff>${diff_output}</git diff>`;
+            
+            async function run() {
+              const result = await model.generateContent(prompt);
+              const response = await result.response;
+              const text = response.text();
+              fs.writeFileSync("review_result.txt", text);
+              console.log("Review results saved!");
+            }
+            
+            return run();
+
+      - name: Format PR review comments
+        id: store
+        run: |
+          COMMENT=$(sed '/^```/d' review_result.txt | jq -c .)
+          echo "comment=$COMMENT" >> $GITHUB_OUTPUT
+
+      - name: Add Pull Request Review Comment
+        uses: nbaztec/add-pr-review-comment@v1.0.7
+        with:
+          comments: ${{ steps.store.outputs.comment }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          repo-token-user-login: 'github-actions[bot]'
+          allow-repeats: false
+
+      - name: Send Discord Notification
+        run: |
+          curl -H "Content-Type: application/json" \
+            -X POST \
+            -d '{"username": "Gemini Bot", "content": "🔔 Gemini 코드 리뷰 완료! PR에서 확인하세요: ${{ github.event.pull_request.html_url }}"}' \
+            ${{ secrets.DISCORD_WEBHOOK_URL }}
