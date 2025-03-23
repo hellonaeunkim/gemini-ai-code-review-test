@@ -69,14 +69,7 @@ jobs:
         id: store # 다음 단계에서 참조할 ID
         run: |
           # Markdown 코드 블록 제거 후 JSON 형식으로 변환
-          CLEANED=$(sed '/^```/d' review_result.txt)
-          
-          # line > 0 필터링
-          COMMENT=$(echo "$CLEANED" | jq '[.[] | select(.line > 0)]')
-          
-          echo "Filtered Comments:"
-          echo "$COMMENT"
-          
+          COMMENT=$(sed '/^```/d' review_result.txt | jq -c .)
           echo "comment=$COMMENT" >> $GITHUB_OUTPUT # 출력 변수에 저장
 
       - name: Add Pull Request Review Comment # PR에 코드 리뷰 코멘트 추가 단계
