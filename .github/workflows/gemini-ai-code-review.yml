@@ -51,17 +51,17 @@ jobs:
             // 한국어로 코드 리뷰 요청 및 특정 JSON 형식으로 응답 요청
             const prompt = const prompt = `Explain in Korean. You are a senior software engineer performing a code review based on the following git diff.
 
-                        - Carefully analyze any blocks of code that were deleted and then added back in the same or similar form.
-                        - If you detect that a code block was removed and then re-added (especially with the same content), please comment on whether that makes sense or seems unnecessary.
-                        - You MUST treat re-added blocks as new additions and comment on their readability, necessity, and maintainability.
+            - Carefully analyze any blocks of code that were deleted and then added back in the same or similar form.
+            - If you detect that a code block was removed and then re-added (especially with the same content), please comment on whether that makes sense or seems unnecessary.
+            - You MUST treat re-added blocks as new additions and comment on their readability, necessity, and maintainability.
             
-                        Use this JSON format strictly:
-                          [{"path":"{filepath}", "line": {line}, "text": "{review comment}", "side": "RIGHT"}]
+            Use this JSON format strictly:
+              [{"path":"{filepath}", "line": {line}, "text": "{review comment}", "side": "RIGHT"}]
             
-                          <git diff>
-                          ${diff_output}
-                          </git diff>
-                          `;
+              <git diff>
+              ${diff_output}
+              </git diff>
+              `;
 
             async function run() {
               const result = await model.generateContent(prompt);
