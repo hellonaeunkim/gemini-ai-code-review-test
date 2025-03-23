@@ -60,7 +60,7 @@ jobs:
       - name: Format PR review comments
         id: store
         run: |
-          COMMENT=$(sed '/^```/d' review_result.txt | jq -c .)
+          COMMENT=$(cat review_result.txt | sed 's/```json//g' | sed 's/```//g' | jq -Rs '.' | jq -c .)
           echo "comment=$COMMENT" >> $GITHUB_OUTPUT
 
       - name: Add Pull Request Review Comment
