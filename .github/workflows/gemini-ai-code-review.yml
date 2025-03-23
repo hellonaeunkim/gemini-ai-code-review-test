@@ -30,8 +30,7 @@ jobs:
             # PR인 경우 base와 head 브랜치 간의 diff 계산
             BASE_REF="${{ github.event.pull_request.base.ref }}"
             HEAD_REF="${{ github.event.pull_request.head.ref }}"
-            git fetch origin "$BASE_REF"
-            git fetch origin "$HEAD_REF"
+            git fetch --no-tags --prune --depth=0 origin +refs/heads/*:refs/remotes/origin/*
             git diff --unified=0 origin/$BASE_REF..origin/$HEAD_REF > diff.txt
           else
             # 직접 실행한 경우 현재 커밋과 이전 커밋 간의 diff 계산
@@ -85,7 +84,7 @@ jobs:
         run: |
           echo "==== diff.txt ===="
           cat diff.txt
-          echo "=================="
+           "=================="
 
 #      - name: Send Discord Notification # Discord에 알림 전송 단계
 #        if: github.event_name == 'pull_request' && success() # PR이고 이전 단계가 성공한 경우에만 실행
