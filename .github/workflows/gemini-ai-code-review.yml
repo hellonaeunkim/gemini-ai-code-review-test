@@ -72,10 +72,3 @@ jobs:
               issue_number: context.issue.number,
               body: reviewText
             });
-
-      - name: Send Discord Notification
-        run: |
-          curl -H "Content-Type: application/json" \
-            -X POST \
-            -d '{"username": "Gemini Bot", "content": "🔔 Gemini 코드 리뷰 완료! PR에서 확인하세요: ${{ github.event.pull_request.html_url }}"}' \
-            ${{ secrets.DISCORD_WEBHOOK_URL }}
