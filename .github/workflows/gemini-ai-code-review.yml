@@ -81,6 +81,12 @@ jobs:
           repo-token-user-login: 'github-actions[bot]' # 코멘트 작성자 설정
           allow-repeats: false # 중복 코멘트 방지
 
+      - name: debug show diff
+        run: |
+          echo "==== diff.txt ===="
+          cat diff.txt
+          echo "=================="
+
 #      - name: Send Discord Notification # Discord에 알림 전송 단계
 #        if: github.event_name == 'pull_request' && success() # PR이고 이전 단계가 성공한 경우에만 실행
 #        run: |
