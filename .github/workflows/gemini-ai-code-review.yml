@@ -69,7 +69,14 @@ jobs:
         id: store # 다음 단계에서 참조할 ID
         run: |
           # Markdown 코드 블록 제거 후 JSON 형식으로 변환
-          COMMENT=$(sed '/^```/d' review_result.txt | jq -c .)
+          CLEANED=$(sed '/^```/d' review_result.txt)
+          
+          # line > 0 필터링
+          COMMENT=$(echo "$CLEANED" | jq '[.[] | select(.line > 0)]')
+          
+          echo "Filtered Comments:"
+          echo "$COMMENT"
+          
           echo "comment=$COMMENT" >> $GITHUB_OUTPUT # 출력 변수에 저장
 
       - name: Add Pull Request Review Comment # PR에 코드 리뷰 코멘트 추가 단계
@@ -81,11 +88,11 @@ jobs:
           repo-token-user-login: 'github-actions[bot]' # 코멘트 작성자 설정
           allow-repeats: false # 중복 코멘트 방지
 
-      - name: Send Discord Notification # Discord에 알림 전송 단계
-        if: github.event_name == 'pull_request' && success() # PR이고 이전 단계가 성공한 경우에만 실행
-        run: |
-          # Discord 웹훅으로 알림 전송
-          curl -H "Content-Type: application/json" \
-            -X POST \
-            -d '{"username": "Gemini Bot", "content": "🔔 Gemini 코드 리뷰 완료! PR에서 확인하세요: ${{ github.event.pull_request.html_url }}"}' \
-            ${{ secrets.DISCORD_WEBHOOK_URL }}
+#      - name: Send Discord Notification # Discord에 알림 전송 단계
+#        if: github.event_name == 'pull_request' && success() # PR이고 이전 단계가 성공한 경우에만 실행
+#        run: |
+#          # Discord 웹훅으로 알림 전송
+#          curl -H "Content-Type: application/json" \
+#            -X POST \
+#            -d '{"username": "Gemini Bot", "content": "🔔 Gemini 코드 리뷰 완료! PR에서 확인하세요: ${{ github.event.pull_request.html_url }}"}' \
+#            ${{ secrets.DISCORD_WEBHOOK_URL }}
