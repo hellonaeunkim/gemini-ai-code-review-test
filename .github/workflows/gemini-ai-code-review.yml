@@ -32,7 +32,7 @@ jobs:
             HEAD_REF="${{ github.event.pull_request.head.ref }}"
             git fetch origin "$BASE_REF"
             git fetch origin "$HEAD_REF"
-            git diff --unified=0 "origin/$BASE_REF" > "diff.txt"
+            git diff --unified=0 origin/$BASE_REF..origin/$HEAD_REF > diff.txt
           else
             # 직접 실행한 경우 현재 커밋과 이전 커밋 간의 diff 계산
             git diff --unified=0 HEAD^ > "diff.txt"
