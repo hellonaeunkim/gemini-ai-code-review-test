@@ -57,19 +57,21 @@ jobs:
             
             return run();
 
-      - name: Format PR review comments
-        id: store
-        run: |
-          COMMENT=$(cat review_result.txt | sed 's/```json//g' | sed 's/```//g' | jq -Rs '.' | jq -c .)
-          echo "comment=$COMMENT" >> $GITHUB_OUTPUT
-
-      - name: Add Pull Request Review Comment
-        uses: nbaztec/add-pr-review-comment@v1.0.7
+      - name: Post comment to PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
         with:
-          comments: ${{ steps.store.outputs.comment }}
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          repo-token-user-login: 'github-actions[bot]'
-          allow-repeats: false
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const reviewText = fs.readFileSync('review_result.txt', 'utf8');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: reviewText
+            });
 
       - name: Send Discord Notification
         run: |
