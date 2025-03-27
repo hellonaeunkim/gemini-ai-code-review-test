@@ -1,19 +1,19 @@
 package annovation.gemini.test.controller;
 
 @RestController
-@RequestMapping("/{user}")
+@RequestMapping("/{users}")
 public class UserController {
 
-    private final UserService userService;
+    private final UsersService usersService;
 
-    public UserController(UserService userService) {
-        this.userService = userService;
+    public UserController(UsersService usersService) {
+        this.usersService = usersService;
     }
 
     // C
     @PostMapping
-    public ResponseEntity<UserEntity> createUser(
-            @RequestBody UserCreateRequest userCreateRequest
+    public ResponseEntity<UsersEntity> createUser(
+            @RequestBody UsersCreateRequest usersCreateRequest
     ) {
         String username = userCreateRequest.getUsername();
         String email = userCreateRequest.getEmail();
