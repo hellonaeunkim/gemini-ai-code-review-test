@@ -1,7 +1,7 @@
 package annovation.gemini.test.controller;
 
 @RestController
-@RequestMapping("/{users}")
+@RequestMapping("/{userId}")
 public class UserController {
 
     private final UserService userService;
