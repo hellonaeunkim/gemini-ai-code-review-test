@@ -1,51 +1,63 @@
-name: Gemini AI Code Review
+name: Gemini AI Code Review # 워크플로우의 이름 정의
 
-on:
-  workflow_dispatch: # GitHub Actions에서 직접 실행 가능
-  pull_request:
+on: # 워크플로우 트리거 정의
+  workflow_dispatch: # GitHub 웹 UI에서 수동으로 워크플로우 실행 가능
+  pull_request: # PR이 열리거나 업데이트될 때 실행
     types: [ opened, synchronize ]
 
 jobs:
-  code-review:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
+  code-review: # 작업 이름 정의
+    runs-on: ubuntu-latest # 작업이 실행될 환경 지정
+    permissions: # 필요한 권한 설정
+      contents: read # 저장소 내용 읽기 권한
+      pull-requests: write # PR 댓글 작성 권한
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - name: Checkout repository # 저장소 체크아웃 단계
+        uses: actions/checkout@v3 # GitHub 제공 액션 사용
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # 전체 히스토리 가져오기 (diff 계산을 위해 필요)
 
-      - name: Set up Node
-        uses: actions/setup-node@v3
+      - name: Set up Node # Node.js 환경 설정 단계
+        uses: actions/setup-node@v3 # Node.js 설치 액션
 
-      - name: Install GoogleGenerativeAI
+      - name: Install GoogleGenerativeAI # Gemini API 라이브러리 설치 단계
         run: |
-          npm install @google/generative-ai
+          npm install @google/generative-ai # Gemini API 클라이언트 설치
 
-      - name: Get git diff
+      - name: Get git diff # 코드 변경사항 추출 단계
         run: |
           if [ "${{ github.event_name }}" == "pull_request" ]; then
-          BASE_REF="${{ github.event.pull_request.base.ref }}"
-          HEAD_REF="${{ github.event.pull_request.head.ref }}"
-          git fetch origin "$BASE_REF"
-          git fetch origin "$HEAD_REF"
-          git diff --unified=0 "origin/$BASE_REF" > "diff.txt"
+          # PR 이벤트인 경우, base 커밋과 head 커밋을 기준으로 변경사항 추출
+          BASE_COMMIT="${{ github.event.before }}"   # PR 전에 있던 커밋 (base)
+          HEAD_COMMIT="${{ github.sha }}"            # PR 현재 커밋 (head)
+          git diff --unified=0 $BASE_COMMIT $HEAD_COMMIT > diff.txt  # 변경된 코드만 추출해서 diff.txt에 저장
           else
-          git diff --unified=0 HEAD^ > "diff.txt"
+          # PR이 아닌 경우 (예: 수동 실행), 직전 커밋과 현재 커밋 사이의 diff 추출
+          git diff --unified=0 HEAD^ HEAD > diff.txt  # 마지막 커밋 기준 변경사항 저장
           fi
 
-      - name: Run Gemini-1.5-flash
-        uses: actions/github-script@v7
+      - name: Run Gemini-1.5-flash # Gemini AI로 코드 리뷰 수행 단계
+        uses: actions/github-script@v7 # JavaScript 실행 액션
         with:
           script: |
             const fs = require("fs");
+            const diff_output = fs.readFileSync("diff.txt", "utf8");
+            
             const { GoogleGenerativeAI } = require("@google/generative-ai");
             const genAI = new GoogleGenerativeAI("${{ secrets.GEMINI_API_KEY }}");
             const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-            const diff_output = fs.readFileSync("diff.txt", "utf8");
-            const prompt = `You are a senior software engineer and need to perform a code review based on the results of a given git diff. Provide feedback for the code changes, highlighting issues related to security, readability, and performance.\n<git diff>${diff_output}</git diff>`;
+            
+            // 한국어로 코드 리뷰 요청 및 특정 JSON 형식으로 응답 요청
+            const prompt = `Explain in korean. You are a senior software engineer and need to perform a code review based on the results of a given git diff.
+            Review the changed code from different perspectives and let us know if there are any changes that need to be made.
+            If you see any code that needs to be fixed in the result of the git diff, you need to calculate the exact line number by referring to the "@@ -0,0 +0,0 @@" part.
+            The output format is [{"path":"{ filepath }", "line": { line }, "text": { review comment }, "side": "RIGHT"}] format must be respected.
+            If the line number is not available or the code was entirely deleted, skip that file from the output.
+            Only include comments for lines with valid, non-zero numbers that exist in the PR diff.
+            If you detect that a code block was removed and then re-added (especially with the same content), please comment on whether that makes sense or seems unnecessary.
+
+
+            <git diff>${diff_output}</git diff>`;
             
             async function run() {
               const result = await model.generateContent(prompt);
@@ -57,23 +69,34 @@ jobs:
             
             return run();
 
-      - name: Format PR review comments
-        id: store
+      - name: Format PR review comments # 리뷰 결과를 PR 코멘트 형식으로 변환 단계
+        if: github.event_name == 'pull_request' # PR인 경우에만 실행
+        id: store # 다음 단계에서 참조할 ID
         run: |
+          # Markdown 코드 블록 제거 후 JSON 형식으로 변환
           COMMENT=$(sed '/^```/d' review_result.txt | jq -c .)
-          echo "comment=$COMMENT" >> $GITHUB_OUTPUT
+          echo "comment=$COMMENT" >> $GITHUB_OUTPUT # 출력 변수에 저장
 
-      - name: Add Pull Request Review Comment
-        uses: nbaztec/add-pr-review-comment@v1.0.7
+      - name: Add Pull Request Review Comment # PR에 코드 리뷰 코멘트 추가 단계
+        if: github.event_name == 'pull_request' # PR인 경우에만 실행
+        uses: nbaztec/add-pr-review-comment@v1.0.7 # 코드 리뷰 코멘트 추가 액션
         with:
-          comments: ${{ steps.store.outputs.comment }}
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          repo-token-user-login: 'github-actions[bot]'
-          allow-repeats: false
+          comments: ${{ steps.store.outputs.comment }} # 이전 단계의 출력 사용
+          repo-token: ${{ secrets.GITHUB_TOKEN }} # GitHub 토큰 사용
+          repo-token-user-login: 'github-actions[bot]' # 코멘트 작성자 설정
+          allow-repeats: false # 중복 코멘트 방지
 
-      - name: Send Discord Notification
+      - name: Debug show diff
         run: |
-          curl -H "Content-Type: application/json" \
-            -X POST \
-            -d '{"username": "Gemini Bot", "content": "🔔 Gemini 코드 리뷰 완료! PR에서 확인하세요: ${{ github.event.pull_request.html_url }}"}' \
-            ${{ secrets.DISCORD_WEBHOOK_URL }}
+          echo "==== diff.txt ===="
+          cat diff.txt
+          echo "=================="
+
+#      - name: Send Discord Notification # Discord에 알림 전송 단계
+#        if: github.event_name == 'pull_request' && success() # PR이고 이전 단계가 성공한 경우에만 실행
+#        run: |
+#          # Discord 웹훅으로 알림 전송
+#          curl -H "Content-Type: application/json" \
+#            -X POST \
+#            -d '{"username": "Gemini Bot", "content": "🔔 Gemini 코드 리뷰 완료! PR에서 확인하세요: ${{ github.event.pull_request.html_url }}"}' \
+#            ${{ secrets.DISCORD_WEBHOOK_URL }}
