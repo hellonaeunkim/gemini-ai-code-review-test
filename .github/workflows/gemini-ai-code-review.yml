@@ -27,15 +27,13 @@ jobs:
       - name: Get git diff # 코드 변경사항 추출 단계
         run: |
           if [ "${{ github.event_name }}" == "pull_request" ]; then
-            # PR인 경우 base와 head 브랜치 간의 diff 계산
-            BASE_REF="${{ github.event.pull_request.base.ref }}"
-            HEAD_REF="${{ github.event.pull_request.head.ref }}"
-            git fetch origin "$BASE_REF"
-            git fetch origin "$HEAD_REF"
-            git diff --unified=0 origin/$BASE_REF..origin/$HEAD_REF > diff.txt
+          # PR 이벤트인 경우, base 커밋과 head 커밋을 기준으로 변경사항 추출
+          BASE_COMMIT="${{ github.event.before }}"   # PR 전에 있던 커밋 (base)
+          HEAD_COMMIT="${{ github.sha }}"            # PR 현재 커밋 (head)
+          git diff --unified=0 $BASE_COMMIT $HEAD_COMMIT > diff.txt  # 변경된 코드만 추출해서 diff.txt에 저장
           else
-            # 직접 실행한 경우 현재 커밋과 이전 커밋 간의 diff 계산
-            git diff --unified=0 HEAD^ > "diff.txt"
+          # PR이 아닌 경우 (예: 수동 실행), 직전 커밋과 현재 커밋 사이의 diff 추출
+          git diff --unified=0 HEAD^ HEAD > diff.txt  # 마지막 커밋 기준 변경사항 저장
           fi
 
       - name: Run Gemini-1.5-flash # Gemini AI로 코드 리뷰 수행 단계
@@ -43,10 +41,11 @@ jobs:
         with:
           script: |
             const fs = require("fs");
+            const diff_output = fs.readFileSync("diff.txt", "utf8");
+            
             const { GoogleGenerativeAI } = require("@google/generative-ai");
             const genAI = new GoogleGenerativeAI("${{ secrets.GEMINI_API_KEY }}");
             const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-            const diff_output = fs.readFileSync("diff.txt", "utf8");
             
             // 한국어로 코드 리뷰 요청 및 특정 JSON 형식으로 응답 요청
             const prompt = `Explain in korean. You are a senior software engineer and need to perform a code review based on the results of a given git diff.
