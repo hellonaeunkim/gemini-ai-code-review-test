@@ -26,15 +26,21 @@ jobs:
 
       - name: Get git diff # 코드 변경사항 추출 단계
         run: |
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-          # PR 이벤트인 경우, base 커밋과 head 커밋을 기준으로 변경사항 추출
-          BASE_COMMIT="${{ github.event.before }}"   # PR 전에 있던 커밋 (base)
-          HEAD_COMMIT="${{ github.sha }}"            # PR 현재 커밋 (head)
-          git diff --unified=0 $BASE_COMMIT $HEAD_COMMIT > diff.txt  # 변경된 코드만 추출해서 diff.txt에 저장
-          else
-          # PR이 아닌 경우 (예: 수동 실행), 직전 커밋과 현재 커밋 사이의 diff 추출
-          git diff --unified=0 HEAD^ HEAD > diff.txt  # 마지막 커밋 기준 변경사항 저장
-          fi
+          # pull_request 이벤트에서 base 커밋이 없거나, GitHub가 000000... 으로 넘길 경우 처리
+               if [ -z "${{ github.event.before }}" ] || [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
+               echo "No valid 'before' commit found. Using pull_request.base.sha instead."
+               BASE_COMMIT="${{ github.event.pull_request.base.sha }}"
+               else
+               BASE_COMMIT="${{ github.event.before }}"
+               fi
+               
+               HEAD_COMMIT="${{ github.sha }}"
+               echo "BASE_COMMIT=$BASE_COMMIT"
+               echo "HEAD_COMMIT=$HEAD_COMMIT"
+               
+               git diff --unified=0 $BASE_COMMIT $HEAD_COMMIT > diff.txt
+               ls -lah && cat diff.txt
+
 
       - name: Run Gemini-1.5-flash # Gemini AI로 코드 리뷰 수행 단계
         uses: actions/github-script@v7 # JavaScript 실행 액션
